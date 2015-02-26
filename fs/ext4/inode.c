@@ -1134,15 +1134,6 @@ void ext4_da_update_reserve_space(struct inode *inode,
 		used = ei->i_reserved_data_blocks;
 	}
 
-	if (unlikely(ei->i_allocated_meta_blocks > ei->i_reserved_meta_blocks)) {
-		ext4_msg(inode->i_sb, KERN_NOTICE, "%s: ino %lu, allocated %d "
-			 "with only %d reserved metadata blocks\n", __func__,
-			 inode->i_ino, ei->i_allocated_meta_blocks,
-			 ei->i_reserved_meta_blocks);
-		WARN_ON(1);
-		ei->i_allocated_meta_blocks = ei->i_reserved_meta_blocks;
-	}
-
 	/* Update per-inode reservations */
 	ei->i_reserved_data_blocks -= used;
 	ei->i_reserved_meta_blocks -= ei->i_allocated_meta_blocks;
@@ -2204,8 +2195,6 @@ static void ext4_da_block_invalidatepages(struct mpage_da_data *mpd)
 
 	index = mpd->first_page;
 	end   = mpd->next_page - 1;
-
-	pagevec_init(&pvec, 0);
 	while (index <= end) {
 		nr_pages = pagevec_lookup(&pvec, mapping, index, PAGEVEC_SIZE);
 		if (nr_pages == 0)
@@ -5109,6 +5098,17 @@ struct inode *ext4_iget(struct super_block *sb, unsigned long ino)
 	return inode;
 
 bad_inode:
+	/* for debugging, woojoong.lee */
+	printk(KERN_ERR "iloc info, offset : %lu,"
+					, iloc.offset);
+	printk(KERN_ERR " group# : %u\n", iloc.block_group);
+	printk(KERN_ERR "sb info, inodes per group : %lu,"
+					, EXT4_SB(sb)->s_inodes_per_group);
+	printk(KERN_ERR " inode size : %d\n"
+					, EXT4_SB(sb)->s_inode_size);
+	print_bh(sb, iloc.bh, 0, EXT4_BLOCK_SIZE(sb));
+	/* end */
+
 	brelse(iloc.bh);
 	iget_failed(inode);
 	return ERR_PTR(ret);

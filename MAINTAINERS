@@ -2491,7 +2491,7 @@ S:	Maintained
 F:	drivers/net/eexpress.*
 
 ETHERNET BRIDGE
-M:	Stephen Hemminger <stephen@networkplumber.org>
+M:	Stephen Hemminger <shemminger@linux-foundation.org>
 L:	bridge@lists.linux-foundation.org
 L:	netdev@vger.kernel.org
 W:	http://www.linuxfoundation.org/en/Net:Bridge
@@ -2719,6 +2719,13 @@ S:	Supported
 F:	Documentation/power/freezing-of-tasks.txt
 F:	include/linux/freezer.h
 F:	kernel/freezer.c
+
+FRONTSWAP API
+M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+L:	linux-kernel@vger.kernel.org
+S:	Maintained
+F:	mm/frontswap.c
+F:	include/linux/frontswap.h
 
 FS-CACHE: LOCAL CACHING FOR NETWORK FILESYSTEMS
 M:	David Howells <dhowells@redhat.com>
@@ -4327,7 +4334,7 @@ S:	Supported
 F:	drivers/infiniband/hw/nes/
 
 NETEM NETWORK EMULATOR
-M:	Stephen Hemminger <stephen@networkplumber.org>
+M:	Stephen Hemminger <shemminger@linux-foundation.org>
 L:	netem@lists.linux-foundation.org
 S:	Maintained
 F:	net/sched/sch_netem.c
@@ -5247,7 +5254,7 @@ F:	Documentation/blockdev/ramdisk.txt
 F:	drivers/block/brd.c
 
 RANDOM NUMBER DRIVER
-M:	Theodore Ts'o" <tytso@mit.edu>
+M:	Matt Mackall <mpm@selenic.com>
 S:	Maintained
 F:	drivers/char/random.c
 
@@ -5779,7 +5786,7 @@ S:	Maintained
 F:	drivers/usb/misc/sisusbvga/
 
 SKGE, SKY2 10/100/1000 GIGABIT ETHERNET DRIVERS
-M:	Stephen Hemminger <stephen@networkplumber.org>
+M:	Stephen Hemminger <shemminger@linux-foundation.org>
 L:	netdev@vger.kernel.org
 S:	Maintained
 F:	drivers/net/skge.*

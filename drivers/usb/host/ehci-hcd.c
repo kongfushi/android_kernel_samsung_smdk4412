@@ -955,7 +955,9 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
 dead:
 		ehci_reset(ehci);
 		ehci_writel(ehci, 0, &ehci->regs->configured_flag);
+#if !defined(CONFIG_CDMA_MODEM_MDM6600)	// for OTG issue
 		usb_hc_died(hcd);
+#endif
 		/* generic layer kills/unlinks all urbs, then
 		 * uses ehci_stop to clean up the rest
 		 */

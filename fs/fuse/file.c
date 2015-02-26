@@ -663,6 +663,13 @@ static int fuse_readpages_fill(void *_data, struct page *page)
 			return -ENOMEM;
 		}
 
+		if (is_cma_pageblock(newpage)) {
+			page_cache_release(oldpage);
+			__free_page(newpage);
+			printk(KERN_ERR "[%s] still on cma pgblk\n", __func__);
+			return -ENOMEM;
+		}
+
 		err = replace_page_cache_page(oldpage, newpage, GFP_KERNEL);
 		if (err) {
 			__free_page(newpage);
@@ -1746,7 +1753,7 @@ static int fuse_verify_ioctl_iov(struct iovec *iov, size_t count)
 	size_t n;
 	u32 max = FUSE_MAX_PAGES_PER_REQ << PAGE_SHIFT;
 
-	for (n = 0; n < count; n++, iov++) {
+	for (n = 0; n < count; n++) {
 		if (iov->iov_len > (size_t) max)
 			return -ENOMEM;
 		max -= iov->iov_len;

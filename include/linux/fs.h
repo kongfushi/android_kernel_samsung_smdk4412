@@ -106,6 +106,11 @@ struct inodes_stat_t {
 /* File is opened with O_PATH; almost nothing can be done with it */
 #define FMODE_PATH		((__force fmode_t)0x4000)
 
+#ifdef CONFIG_FADV_NOACTIVE     
+/* Pages in this file cannot be the active page */
+#define FMODE_NOACTIVE          ((__force fmode_t)0x80000)
+#endif
+
 /* File was opened by fanotify and shouldn't generate fanotify events */
 #define FMODE_NONOTIFY		((__force fmode_t)0x1000000)
 
@@ -523,7 +528,6 @@ enum positive_aop_returns {
 struct page;
 struct address_space;
 struct writeback_control;
-enum migrate_mode;
 
 struct iov_iter {
 	const struct iovec *iov;
@@ -608,12 +612,9 @@ struct address_space_operations {
 			loff_t offset, unsigned long nr_segs);
 	int (*get_xip_mem)(struct address_space *, pgoff_t, int,
 						void **, unsigned long *);
-	/*
-	 * migrate the contents of a page to the specified target. If sync
-	 * is false, it must not block.
-	 */
+	/* migrate the contents of a page to the specified target */
 	int (*migratepage) (struct address_space *,
-			struct page *, struct page *, enum migrate_mode);
+			struct page *, struct page *);
 	int (*launder_page) (struct page *);
 	int (*is_partially_uptodate) (struct page *, read_descriptor_t *,
 					unsigned long);
@@ -2033,7 +2034,6 @@ extern void unregister_blkdev(unsigned int, const char *);
 extern struct block_device *bdget(dev_t);
 extern struct block_device *bdgrab(struct block_device *bdev);
 extern void bd_set_size(struct block_device *, loff_t size);
-extern sector_t blkdev_max_block(struct block_device *bdev);
 extern void bd_forget(struct inode *inode);
 extern void bdput(struct block_device *);
 extern void invalidate_bdev(struct block_device *);
@@ -2482,8 +2482,7 @@ extern int generic_check_addressable(unsigned, u64);
 
 #ifdef CONFIG_MIGRATION
 extern int buffer_migrate_page(struct address_space *,
-				struct page *, struct page *,
-				enum migrate_mode);
+				struct page *, struct page *);
 #else
 #define buffer_migrate_page NULL
 #endif

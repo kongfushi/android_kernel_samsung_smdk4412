@@ -130,6 +130,10 @@ static int ohci_hcd_s5p_drv_resume(struct device *dev)
 #endif
 
 #ifdef CONFIG_USB_SUSPEND
+#ifdef CONFIG_CDMA_MODEM_MDM6600
+static int ohci_hcd_s5p_drv_flag;
+#endif
+
 static int ohci_hcd_s5p_drv_runtime_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -161,9 +165,13 @@ static int ohci_hcd_s5p_drv_runtime_suspend(struct device *dev)
 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 	spin_unlock_irqrestore(&ohci->lock, flags);
 
-	if (pdata->phy_suspend)
+	if (pdata->phy_suspend)	{
 		pdata->phy_suspend(pdev, S5P_USB_PHY_HOST);
 
+#ifdef CONFIG_CDMA_MODEM_MDM6600
+		ohci_hcd_s5p_drv_flag = 1;	// phy_suspend called
+#endif
+	}
 	return rc;
 }
 
@@ -175,15 +183,26 @@ static int ohci_hcd_s5p_drv_runtime_resume(struct device *dev)
 	struct usb_hcd *hcd = s5p_ohci->hcd;
 	int ret = 0;
 
+#ifdef CONFIG_CDMA_MODEM_MDM6600
+	if (pdata->phy_resume && ohci_hcd_s5p_drv_flag)	{
+		pdata->phy_resume(pdev, S5P_USB_PHY_HOST);
+		
+		ohci_hcd_s5p_drv_flag = 0;
+	}
+#endif
+
 	if (dev->power.is_suspended)
 		return 0;
 
+#ifndef CONFIG_CDMA_MODEM_MDM6600
 	if (pdata->phy_resume)
 		ret = pdata->phy_resume(pdev, S5P_USB_PHY_HOST);
-
+#endif
 	if (!ret) {
-		set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-		ohci_finish_controller_resume(hcd);
+		if (hcd) {
+			set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+			ohci_finish_controller_resume(hcd);
+		}
 	}
 
 	return 0;
@@ -280,6 +299,10 @@ static ssize_t store_ohci_power(struct device *dev,
 	device_lock(dev);
 	if (!power_on && s5p_ohci->power_on) {
 		printk(KERN_DEBUG "%s: OHCI turns off\n", __func__);
+#if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB)
+		if (hcd->self.root_hub)
+			pm_runtime_forbid(&hcd->self.root_hub->dev);
+#endif
 		pm_runtime_forbid(dev);
 		s5p_ohci->power_on = 0;
 		usb_remove_hcd(hcd);
@@ -292,6 +315,10 @@ static ssize_t store_ohci_power(struct device *dev,
 			pm_runtime_forbid(dev);
 			usb_remove_hcd(hcd);
 		} else {
+#ifdef CONFIG_CDMA_MODEM_MDM6600
+			if (pdata && pdata->phy_resume)
+				pdata->phy_resume(pdev, S5P_USB_PHY_HOST);
+#endif
 			if (pdata && pdata->phy_init)
 				pdata->phy_init(pdev, S5P_USB_PHY_HOST);
 		}
@@ -470,11 +497,19 @@ static void ohci_hcd_s5p_drv_shutdown(struct platform_device *pdev)
 	if (!s5p_ohci->power_on)
 		return;
 
-	if (pdata && pdata->phy_resume)
-		pdata->phy_resume(pdev, S5P_USB_PHY_HOST);
+	if (!hcd)
+		return;
 
-	if (hcd->driver->shutdown)
-		hcd->driver->shutdown(hcd);
+	if (!hcd->rh_registered)
+		return;
+
+	if(!&hcd->flags)
+		return;
+
+	if (test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags)) {
+		if (hcd->driver->shutdown)
+			hcd->driver->shutdown(hcd);
+	}
 
 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 

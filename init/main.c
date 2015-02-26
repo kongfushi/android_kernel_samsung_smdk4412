@@ -79,12 +79,6 @@
 #include <asm/smp.h>
 #endif
 
-#if defined (CONFIG_MACH_U1_NA_SPR)
-#ifdef CONFIG_SEC_DEBUG
-#include <linux/kernel_sec_common.h>
-#endif
-#endif
-
 static int kernel_init(void *);
 
 extern void init_IRQ(void);
@@ -555,6 +549,9 @@ asmlinkage void __init start_kernel(void)
 	early_boot_irqs_disabled = false;
 	local_irq_enable();
 
+	/* Interrupts are enabled now so all GFP allocations are safe. */
+	gfp_allowed_mask = __GFP_BITS_MASK;
+
 	kmem_cache_init_late();
 
 	/*
@@ -627,11 +624,6 @@ asmlinkage void __init start_kernel(void)
 	sfi_init_late();
 
 	ftrace_init();
-#if defined (CONFIG_MACH_U1_NA_SPR)
-#ifdef CONFIG_SEC_DEBUG
-	kernel_sec_init();
-#endif
-#endif
 
 	/* Do the rest non-__init'ed, we're now alive */
 	rest_init();
@@ -793,10 +785,6 @@ static int __init kernel_init(void * unused)
 	 * Wait until kthreadd is all set-up.
 	 */
 	wait_for_completion(&kthreadd_done);
-
-	/* Now the scheduler is fully set up and can do blocking allocations */
-	gfp_allowed_mask = __GFP_BITS_MASK;
-
 	/*
 	 * init can allocate pages on any node
 	 */

@@ -266,11 +266,7 @@ struct mmc_host {
 	int			clk_requests;	/* internal reference counter */
 	unsigned int		clk_delay;	/* number of MCI clk hold cycles */
 	bool			clk_gated;	/* clock gated */
-#ifdef CONFIG_WIMAX_CMC
-	struct work_struct	clk_gate_work;	/* delayed clock gate */
-#else
 	struct delayed_work	clk_gate_work; /* delayed clock gate */
-#endif
 	unsigned int		clk_old;	/* old clock value cache */
 	spinlock_t		clk_lock;	/* lock for clk fields */
 	struct mutex		clk_gate_mutex;	/* mutex for clock gating */
@@ -344,7 +340,6 @@ struct mmc_host {
 
 	unsigned int		sdio_irqs;
 	struct task_struct	*sdio_irq_thread;
-	bool			sdio_irq_pending;
 	atomic_t		sdio_irq_thread_abort;
 
 	mmc_pm_flag_t		pm_flags;	/* requested pm features */
@@ -367,6 +362,9 @@ struct mmc_host {
 		int				num_funcs;
 	} embedded_sdio_data;
 #endif
+
+	struct device *bus_dev;
+	struct device *host_dev;
 
 	struct mmc_async_req	*areq;		/* active async req */
 
@@ -423,7 +421,6 @@ extern int mmc_cache_ctrl(struct mmc_host *, u8);
 static inline void mmc_signal_sdio_irq(struct mmc_host *host)
 {
 	host->ops->enable_sdio_irq(host, 0);
-	host->sdio_irq_pending = true;
 	wake_up_process(host->sdio_irq_thread);
 }
 

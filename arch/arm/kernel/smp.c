@@ -58,13 +58,14 @@ enum ipi_msg_type {
 	IPI_CPU_BACKTRACE,
 };
 
-static DECLARE_COMPLETION(cpu_running);
-
 int __cpuinit __cpu_up(unsigned int cpu)
 {
 	struct cpuinfo_arm *ci = &per_cpu(cpu_data, cpu);
 	struct task_struct *idle = ci->idle;
 	pgd_t *pgd;
+#if defined(CONFIG_MACH_Q1_BD)
+	static pgd_t *s_pgd[CONFIG_NR_CPUS];
+#endif
 	int ret;
 
 	/*
@@ -92,7 +93,12 @@ int __cpuinit __cpu_up(unsigned int cpu)
 	 * of our "standard" page tables, with the addition of
 	 * a 1:1 mapping for the physical address of the kernel.
 	 */
+#if defined(CONFIG_MACH_Q1_BD)
+	s_pgd[cpu] = s_pgd[cpu] ?: pgd_alloc(&init_mm);
+	pgd = s_pgd[cpu];
+#else
 	pgd = pgd_alloc(&init_mm);
+#endif
 	if (!pgd)
 		return -ENOMEM;
 
@@ -119,12 +125,20 @@ int __cpuinit __cpu_up(unsigned int cpu)
 	 */
 	ret = boot_secondary(cpu, idle);
 	if (ret == 0) {
+		unsigned long timeout;
+
 		/*
 		 * CPU was successfully started, wait for it
 		 * to come online or time out.
 		 */
-		wait_for_completion_timeout(&cpu_running,
-						 msecs_to_jiffies(1000));
+		timeout = jiffies + HZ;
+		while (time_before(jiffies, timeout)) {
+			if (cpu_online(cpu))
+				break;
+
+			udelay(10);
+			barrier();
+		}
 
 		if (!cpu_online(cpu)) {
 			pr_crit("CPU%u: failed to come online\n", cpu);
@@ -145,7 +159,9 @@ int __cpuinit __cpu_up(unsigned int cpu)
 		identity_mapping_del(pgd, __pa(_sdata), __pa(_edata));
 	}
 
+#if !defined(CONFIG_MACH_Q1_BD)
 	pgd_free(&init_mm, pgd);
+#endif
 
 	return ret;
 }
@@ -288,26 +304,18 @@ static inline int skip_secondary_calibrate(void)
 asmlinkage void __cpuinit secondary_start_kernel(void)
 {
 	struct mm_struct *mm = &init_mm;
-	unsigned int cpu;
-
-	/*
-	 * The identity mapping is uncached (strongly ordered), so
-	 * switch away from it before attempting any exclusive accesses.
-	 */
-	cpu_switch_mm(mm->pgd, mm);
-	enter_lazy_tlb(mm, current);
-	local_flush_tlb_all();
+	unsigned int cpu = smp_processor_id();
 
 	/*
 	 * All kernel threads share the same mm context; grab a
 	 * reference and switch to it.
 	 */
-	cpu = smp_processor_id();
 	atomic_inc(&mm->mm_count);
 	current->active_mm = mm;
 	cpumask_set_cpu(cpu, mm_cpumask(mm));
-
-	printk("CPU%u: Booted secondary processor\n", cpu);
+	cpu_switch_mm(mm->pgd, mm);
+	enter_lazy_tlb(mm, current);
+	local_flush_tlb_all();
 
 	printk("CPU%u: Booted secondary processor\n", cpu);
 
@@ -330,10 +338,9 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 	/*
 	 * OK, now it's safe to let the boot CPU continue.  Wait for
 	 * the CPU migration code to notice that the CPU is online
-	 * before we continue - which happens after __cpu_up returns.
+	 * before we continue.
 	 */
 	set_cpu_online(cpu, true);
-	complete(&cpu_running);
 
 	/*
 	 * Setup the percpu timer for this CPU.
